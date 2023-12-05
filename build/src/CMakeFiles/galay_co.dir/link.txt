@@ -1,0 +1,2 @@
+/usr/bin/ar qc libgalay_co.a CMakeFiles/galay_co.dir/galay_co.cc.o CMakeFiles/galay_co.dir/galay_co_scheduler.cc.o
+/usr/bin/ranlib libgalay_co.a
