@@ -30,25 +30,30 @@ public:
         return fd;
     }
 
-    static ssize_t co_recv(int fd, void *buf, size_t n, int flags)
+    static Coroutine<Net_Result::Ptr> co_accept(int fd , sockaddr* addr , socklen_t* len)
     {
-        Coroutine<Net_Result::Ptr> co = co_recv(fd, buf, n, flags, 1);
-        return co.promise().result()->ret;
+        int ret = accept(fd,addr,len);
+        Net_Result::Ptr res = std::make_shared<Net_Result>(ret);
+        co_return std::move(res);
+    }
+
+    static Coroutine<Net_Result::Ptr> co_recv(int fd, void *buf, size_t n, int flags)
+    {
+        int ret = recv(fd, buf, n, flags);
+        Net_Result::Ptr res = std::make_shared<Net_Result>(ret);
+        co_return std::move(res);
+    }
+
+    static Coroutine<Net_Result::Ptr> co_send(int fd, void *buf, size_t n, int flags)
+    {
+        int ret = send(fd, buf, n, flags);
+        Net_Result::Ptr res = std::make_shared<Net_Result>(ret);
+        co_return std::move(res);
     }
 
 private:
 
-    static Coroutine<Net_Result::Ptr> co_recv(int fd, void *buf, size_t n, int flags,int t)
-    {
-        while(1)
-        {
-            if(recv(fd,buf,n,flags) == -1)
-            {
-                co_await Awaiter();
-                
-            }
-        }
-    }
+    
 };
 
 

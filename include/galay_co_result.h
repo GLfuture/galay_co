@@ -13,6 +13,10 @@ public:
 class Net_Result: public Result
 {
 public:
+    Net_Result(ssize_t ret)
+    {
+        this->ret = ret;
+    }
     using Ptr = std::shared_ptr<Net_Result>;
     ssize_t ret = 0;
 };

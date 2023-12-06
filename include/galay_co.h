@@ -12,6 +12,7 @@ enum Co_Status
 	READY,
 	RUNNING,
 	SUSPEND,
+	TERM,
 	FINISH,
 };
 
@@ -38,8 +39,14 @@ public:
 		return {}; 
 	}
 
-    template<typename T>
-    auto yield_value(const T& value){
+    auto yield_value(const RESULT& value){
+		m_result = value;
+		co_status = SUSPEND;
+        return std::suspend_always{};
+    }
+
+	auto yield_value(RESULT&& value){
+		m_result = value;
 		co_status = SUSPEND;
         return std::suspend_always{};
     }
@@ -154,6 +161,13 @@ class Coroutine
 public:
 	using promise_type = Promise<RESULT>;
 
+	Coroutine<RESULT> &operator=(Coroutine<RESULT>&& other)
+	{
+		this->co_handle = other.co_handle;
+		this->co_id = other.co_id;
+		return *this;
+	}
+
 	Coroutine(){}
 
 	Coroutine(std::coroutine_handle<promise_type> co_handle) noexcept
@@ -196,18 +210,17 @@ public:
 
 	~Coroutine()
 	{
+		std::cout<<"析构:"<<co_id<<std::endl;
 		if (co_handle) co_handle.destroy();
 	}
 
 	Coroutine(const Coroutine& other) = delete;
 
 	Coroutine& operator=(Coroutine& other) = delete;
-
+	
 private:
 	//协程id
 	uint64_t co_id = 0;
-	//调度器指针
-	std::shared_ptr<Scheduler<RESULT>> co_scheduler = nullptr;
 	//协程句柄
 	std::coroutine_handle<promise_type> co_handle = nullptr;
 };

@@ -1,0 +1,17 @@
+[
+{
+  "directory": "/home/gong/projects/galay_co/build",
+  "command": "/usr/bin/g++ -I/home/gong/projects/galay_co/include -g -fcoroutines -std=gnu++20 -o CMakeFiles/test.dir/test.cc.o -c /home/gong/projects/galay_co/test.cc",
+  "file": "/home/gong/projects/galay_co/test.cc"
+},
+{
+  "directory": "/home/gong/projects/galay_co/build",
+  "command": "/usr/bin/g++ -I/home/gong/projects/galay_co/include -g -fcoroutines -std=gnu++20 -o src/CMakeFiles/galay_co.dir/galay_co.cc.o -c /home/gong/projects/galay_co/src/galay_co.cc",
+  "file": "/home/gong/projects/galay_co/src/galay_co.cc"
+},
+{
+  "directory": "/home/gong/projects/galay_co/build",
+  "command": "/usr/bin/g++ -I/home/gong/projects/galay_co/include -g -fcoroutines -std=gnu++20 -o src/CMakeFiles/galay_co.dir/galay_co_scheduler.cc.o -c /home/gong/projects/galay_co/src/galay_co_scheduler.cc",
+  "file": "/home/gong/projects/galay_co/src/galay_co_scheduler.cc"
+}
+]

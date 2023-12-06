@@ -542,8 +542,12 @@ src/CMakeFiles/galay_co.dir/galay_co_scheduler.cc.o: /home/gong/projects/galay_c
   /usr/include/x86_64-linux-gnu/sys/time.h \
   /usr/include/semaphore.h \
   /usr/include/x86_64-linux-gnu/bits/semaphore.h \
-  /usr/include/assert.h
+  /usr/include/assert.h \
+  /usr/include/x86_64-linux-gnu/sys/epoll.h \
+  /usr/include/x86_64-linux-gnu/bits/epoll.h
 
+
+/usr/include/x86_64-linux-gnu/sys/epoll.h:
 
 /usr/include/assert.h:
 
@@ -810,6 +814,8 @@ src/CMakeFiles/galay_co.dir/galay_co_scheduler.cc.o: /home/gong/projects/galay_c
 /usr/include/x86_64-linux-gnu/bits/pthreadtypes-arch.h:
 
 /usr/include/locale.h:
+
+/usr/include/x86_64-linux-gnu/bits/epoll.h:
 
 /usr/include/x86_64-linux-gnu/bits/types/time_t.h:
 
