@@ -210,6 +210,7 @@ public:
 
 	~Coroutine()
 	{
+		std::cout<<"析构："<<co_id<<'\n';
 		if (co_handle) {
 			co_handle.destroy();
 		}

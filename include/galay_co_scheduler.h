@@ -119,10 +119,6 @@ public:
 		{
 			delete it->second;
 			it->second = nullptr;
-			epoll_event ev;
-			ev.data.fd = it->first;
-			ev.events = EPOLLIN;
-			epoll_ctl(this->epfd,EPOLL_CTL_DEL,it->first,&ev);
 			it = m_coroutines.erase(it);
 			if(it == m_coroutines.end()){
 				break;
@@ -165,6 +161,6 @@ protected:
 };
 
 
-extern Co_Net_Scheduler<int>* scheduler;
+// extern Co_Net_Scheduler<int>* scheduler;
 
 #endif // !__GALAY_CO_SCHEDULER_H__

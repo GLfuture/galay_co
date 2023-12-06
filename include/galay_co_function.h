@@ -13,9 +13,9 @@
 class Co_Function
 {
 public:
-	static int co_socket(int domain,int type,int protocol)
+	static int co_socket(int domain,int type)
 	{
-        int fd = socket(domain, type, protocol);
+        int fd = socket(domain, type, 0);
         if (fd == -1)
         {
             return -1;
@@ -34,7 +34,7 @@ public:
     static int co_bind(int domain , int fd , int port , uint32_t addr)
     {
         sockaddr_in saddr;
-        saddr.sin_family = AF_INET;
+        saddr.sin_family = domain;
         saddr.sin_port = htons(port);
         saddr.sin_addr.s_addr = htonl(addr);
         return bind( fd , (sockaddr *)&saddr, sizeof(sockaddr));
@@ -61,8 +61,6 @@ public:
                 }
                 else
                 {
-                    scheduler->add_epoll(sockfd, EPOLLIN);
-                    std::cout<<sockfd<<std::endl;
                     co_yield sockfd;
                 }
             }else{
@@ -79,7 +77,6 @@ public:
         {
             len = recv(fd, buf, n, 0);
             if(len == 0 || (len == -1 && !(errno == EWOULDBLOCK || errno == EINTR || errno == EAGAIN  ))){
-                scheduler->del_epoll(fd,EPOLLIN);
                 close(fd);
                 break;
             }
@@ -95,13 +92,29 @@ public:
         {
             len = send(fd, buf, *n, 0);
             if(len == -1 && !(errno == EWOULDBLOCK || errno == EINTR || errno == EAGAIN )){
-                scheduler->del_epoll(fd,EPOLLOUT);
                 close(fd);
                 break;
             }
             co_yield len;
         }
         co_return std::move(len);
+    }
+
+    static Coroutine<int> co_connect(int domain,int fd,const char* ip , int port)
+    {
+        sockaddr_in saddr;
+        saddr.sin_family = domain;
+        saddr.sin_port = htons(port);
+        saddr.sin_addr.s_addr = inet_addr(ip);
+        while (1)
+        {
+            int ret = connect(fd,(sockaddr*)&saddr,sizeof(sockaddr));
+            if(ret == 0 || (ret == -1 && errno == EISCONN) ) break;
+            else if(ret == -1 && errno == EINPROGRESS) {}
+            else co_return std::move(-1);
+            co_yield ret;
+        }
+        co_return std::move(0);
     }
 
 };

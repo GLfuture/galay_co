@@ -7,6 +7,8 @@
 #include <signal.h>
 using namespace std;
 
+Co_Net_Scheduler<int>* scheduler = Co_Net_Scheduler<int>::GetInstance("system");
+
 Coroutine<int> recv_and_send(int fd)
 {
 	char buffer[512];
@@ -26,7 +28,11 @@ Coroutine<int> recv_and_send(int fd)
 		if(scheduler->get_cur_event()->events & EPOLLIN)
 		{
 			rco.resume();
-			if(rco.done()) break;
+			if(rco.done()) 
+			{
+				scheduler->del_epoll(fd,EPOLLIN);
+				break;
+			}
 			len = rco.promise().result() ;
 			std::string msg(buffer, rco.promise().result());
 			std::cout << msg << std::endl;
@@ -34,7 +40,10 @@ Coroutine<int> recv_and_send(int fd)
 		}else if(scheduler->get_cur_event()->events & EPOLLOUT)
 		{
 			wco.resume();
-			if(wco.done()) break;
+			if(wco.done()) {	
+				scheduler->del_epoll(fd,EPOLLOUT);
+				break;
+			}
 			std::cout<< wco.promise().result() <<" " << buffer<<'\n';
 			scheduler->mod_epoll(fd, EPOLLIN);
 			memset(buffer,0,512);
@@ -56,6 +65,7 @@ Coroutine<int> get_conn(int fd)
 		if(aco.promise().result() <= 0) continue; 
 		Coroutine<int>* rwco = new Coroutine<int>(recv_and_send(aco.promise().result()));
 		scheduler->add_coroutine(aco.promise().result(),rwco);
+		scheduler->add_epoll(aco.promise().result(),EPOLLIN);
 	}
 }
 
@@ -69,8 +79,7 @@ void signal_handle(int sing)
 int main()
 {
 	signal(SIGINT,signal_handle);
-	int fd = Co_Function::co_socket(AF_INET,SOCK_STREAM,0);
-	
+	int fd = Co_Function::co_socket(AF_INET,SOCK_STREAM);
 	Co_Function::co_bind(AF_INET,fd,9999,INADDR_ANY);
 	Co_Function::co_listen(fd,10);
 	scheduler->add_epoll(fd,EPOLLIN);
