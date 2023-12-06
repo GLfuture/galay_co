@@ -3,6 +3,8 @@
 
 #include "galay_co_scheduler.h"
 #include "galay_co_result.h"
+#include <netinet/in.h>
+#include <arpa/inet.h>
 #include <sys/epoll.h>
 #include <sys/socket.h>
 #include <unistd.h>
@@ -29,6 +31,20 @@ public:
         return fd;
     }
 
+    static int co_bind(int domain , int fd , int port , uint32_t addr)
+    {
+        sockaddr_in saddr;
+        saddr.sin_family = AF_INET;
+        saddr.sin_port = htons(port);
+        saddr.sin_addr.s_addr = htonl(addr);
+        return bind( fd , (sockaddr *)&saddr, sizeof(sockaddr));
+    }
+
+    static int co_listen(int fd,int backlog)
+    {
+        return listen(fd, backlog);
+    }
+
     static Coroutine<int> co_accept(int fd , sockaddr* addr , socklen_t* len)
     {
         int sockfd;
@@ -45,10 +61,7 @@ public:
                 }
                 else
                 {
-                    epoll_event ev;
-                    ev.data.fd = sockfd;
-                    ev.events = EPOLLIN;
-                    scheduler->add_epoll(sockfd, ev);
+                    scheduler->add_epoll(sockfd, EPOLLIN);
                     std::cout<<sockfd<<std::endl;
                     co_yield sockfd;
                 }
@@ -59,17 +72,14 @@ public:
         co_return std::move(sockfd);
     }
 
-    static Coroutine<int> co_recv(int fd, void *buf, size_t n, int flags)
+    static Coroutine<int> co_recv(int fd, void *buf, size_t n)
     {
         int len;
         while(1)
         {
-            len = recv(fd, buf, n, flags);
+            len = recv(fd, buf, n, 0);
             if(len == 0 || (len == -1 && !(errno == EWOULDBLOCK || errno == EINTR || errno == EAGAIN  ))){
-                epoll_event ev;
-                ev.data.fd = fd;
-                ev.events = EPOLLIN;
-                scheduler->del_epoll(fd,ev);
+                scheduler->del_epoll(fd,EPOLLIN);
                 close(fd);
                 break;
             }
@@ -78,17 +88,14 @@ public:
         co_return std::move(len);
     }
 
-    static Coroutine<int> co_send(int fd, void *buf, size_t n, int flags)
+    static Coroutine<int> co_send(int fd, void *buf, size_t* n)
     {
         int len;
         while (1)
         {
-            len = send(fd, buf, n, flags);
+            len = send(fd, buf, *n, 0);
             if(len == -1 && !(errno == EWOULDBLOCK || errno == EINTR || errno == EAGAIN )){
-                epoll_event ev;
-                ev.data.fd = fd;
-                ev.events = EPOLLIN;
-                scheduler->del_epoll(fd,ev);
+                scheduler->del_epoll(fd,EPOLLOUT);
                 close(fd);
                 break;
             }
@@ -97,7 +104,6 @@ public:
         co_return std::move(len);
     }
 
-    
 };
 
 

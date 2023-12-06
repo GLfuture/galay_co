@@ -78,11 +78,11 @@ public:
 			int nready = epoll_wait(this->epfd,this->events,MAX_EVENT_SIZE,timeout);
 			while(nready -- > 0)
 			{
+				cur_event = events + nready;
 				typename std::map<uint32_t,Coroutine<RESULT>*>::iterator it = m_coroutines.find(events[nready].data.fd);
 				if(it != m_coroutines.end()){
 					it->second->resume();
 				}
-				std::cout<<m_coroutines.size()<<'\n';
 			}
 		}
 	}
@@ -106,6 +106,11 @@ public:
 		return this->epfd;
 	}
 
+	epoll_event* get_cur_event()
+	{
+		return this->cur_event;
+	}
+
 	~Co_Net_Scheduler()
 	{
 		assert(m_stop.load());
@@ -124,26 +129,35 @@ public:
 			}
 			it -- ;
 		}
-		std::cout<<"析构完成"<<std::endl;
 	}
 
-	int add_epoll(int fd , epoll_event& ev)
+	int add_epoll(int fd , uint32_t event)
 	{
+		epoll_event ev;
+		ev.data.fd = fd;
+		ev.events = event;
 		return epoll_ctl(this->epfd,EPOLL_CTL_ADD,fd,&ev);
 	}
 
-	int del_epoll(int fd , epoll_event& ev)
+	int del_epoll(int fd , uint32_t event)
 	{
+		epoll_event ev;
+		ev.data.fd = fd;
+		ev.events = event;
 		return epoll_ctl(this->epfd,EPOLL_CTL_DEL,fd,&ev);
 	}
 
-	int mod_epoll(int fd , epoll_event& ev)
+	int mod_epoll(int fd , uint32_t event)
 	{
+		epoll_event ev;
+		ev.data.fd = fd;
+		ev.events = event;
 		return epoll_ctl(this->epfd,EPOLL_CTL_MOD,fd,&ev);
 	}
 
 protected:
 	int epfd;
+	epoll_event* cur_event = nullptr;
 	epoll_event events[MAX_EVENT_SIZE];
 	std::string m_name;
 	std::atomic_bool m_stop = false;
