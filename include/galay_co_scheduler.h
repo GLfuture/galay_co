@@ -1,6 +1,7 @@
 #ifndef __GALAY_CO_SCHEDULER_H__
 #define __GALAY_CO_SCHEDULER_H__
 #include "galay_co.h"
+#include "galay_co_result.h"
 #include <map>
 #include <list>
 #include <string>
@@ -11,6 +12,7 @@
 #include <sys/epoll.h>
 
 #define MAX_EVENT_SIZE		1024
+
 
 template<typename RESULT>
 class Co_Scheduler
@@ -51,10 +53,12 @@ public:
 		m_coroutines[fd] = co;
 	}
 
-	void del_corotine(uint32_t fd)
+	void del_coroutine(uint32_t fd)
 	{
 		typename std::map<uint32_t,Coroutine<RESULT>*>::iterator it = m_coroutines.find(fd);
 		if(it == m_coroutines.end()) return;
+		delete it->second;
+		it->second = nullptr;
 		m_coroutines.erase(it);
 	}
 
@@ -78,8 +82,13 @@ public:
 				if(it != m_coroutines.end()){
 					it->second->resume();
 				}
+				std::cout<<m_coroutines.size()<<'\n';
 			}
 		}
+	}
+
+	bool is_stop(){
+		return this->m_stop.load();
 	}
 
 	void stop() override
@@ -88,7 +97,7 @@ public:
 		for (auto &[ _ , value] : m_coroutines)
 		{
 			value->promise().set_status(TERM);
-			value->resume();
+			if(!value->done()) value->resume();
 		}
 	}
 
@@ -104,12 +113,35 @@ public:
 			it != m_coroutines.end();it++)
 		{
 			delete it->second;
+			it->second = nullptr;
+			epoll_event ev;
+			ev.data.fd = it->first;
+			ev.events = EPOLLIN;
+			epoll_ctl(this->epfd,EPOLL_CTL_DEL,it->first,&ev);
 			it = m_coroutines.erase(it);
-			if(it != m_coroutines.end()){
-				it--;
+			if(it == m_coroutines.end()){
+				break;
 			}
+			it -- ;
 		}
+		std::cout<<"析构完成"<<std::endl;
 	}
+
+	int add_epoll(int fd , epoll_event& ev)
+	{
+		return epoll_ctl(this->epfd,EPOLL_CTL_ADD,fd,&ev);
+	}
+
+	int del_epoll(int fd , epoll_event& ev)
+	{
+		return epoll_ctl(this->epfd,EPOLL_CTL_DEL,fd,&ev);
+	}
+
+	int mod_epoll(int fd , epoll_event& ev)
+	{
+		return epoll_ctl(this->epfd,EPOLL_CTL_MOD,fd,&ev);
+	}
+
 protected:
 	int epfd;
 	epoll_event events[MAX_EVENT_SIZE];
@@ -118,5 +150,7 @@ protected:
 	std::map<uint32_t,Coroutine<RESULT>*> m_coroutines;
 };
 
+
+extern Co_Net_Scheduler<int>* scheduler;
 
 #endif // !__GALAY_CO_SCHEDULER_H__

@@ -210,8 +210,9 @@ public:
 
 	~Coroutine()
 	{
-		std::cout<<"析构:"<<co_id<<std::endl;
-		if (co_handle) co_handle.destroy();
+		if (co_handle) {
+			co_handle.destroy();
+		}
 	}
 
 	Coroutine(const Coroutine& other) = delete;

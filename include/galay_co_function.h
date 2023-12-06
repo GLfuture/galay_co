@@ -16,13 +16,12 @@ public:
         int fd = socket(domain, type, protocol);
         if (fd == -1)
         {
-            printf("Failed to create a new socket\n");
             return -1;
         }
         int ret = fcntl(fd, F_SETFL, O_NONBLOCK);
         if (ret == -1)
         {
-            close(ret);
+            close(fd);
             return -1;
         }
         int option = 1;
@@ -30,28 +29,73 @@ public:
         return fd;
     }
 
-    static Coroutine<Net_Result::Ptr> co_accept(int fd , sockaddr* addr , socklen_t* len)
+    static Coroutine<int> co_accept(int fd , sockaddr* addr , socklen_t* len)
     {
-        int ret = accept(fd,addr,len);
-        Net_Result::Ptr res = std::make_shared<Net_Result>(ret);
-        co_return std::move(res);
+        int sockfd;
+        while (1)
+        {
+            sockfd = accept(fd,addr,len);
+            if(sockfd > 0)
+            {
+                int ret = fcntl(sockfd, F_SETFL, O_NONBLOCK);
+                if (ret == -1)
+                {
+                    close(sockfd);
+                    co_yield ret;
+                }
+                else
+                {
+                    epoll_event ev;
+                    ev.data.fd = sockfd;
+                    ev.events = EPOLLIN;
+                    scheduler->add_epoll(sockfd, ev);
+                    std::cout<<sockfd<<std::endl;
+                    co_yield sockfd;
+                }
+            }else{
+                co_yield sockfd;
+            }
+        }
+        co_return std::move(sockfd);
     }
 
-    static Coroutine<Net_Result::Ptr> co_recv(int fd, void *buf, size_t n, int flags)
+    static Coroutine<int> co_recv(int fd, void *buf, size_t n, int flags)
     {
-        int ret = recv(fd, buf, n, flags);
-        Net_Result::Ptr res = std::make_shared<Net_Result>(ret);
-        co_return std::move(res);
+        int len;
+        while(1)
+        {
+            len = recv(fd, buf, n, flags);
+            if(len == 0 || (len == -1 && !(errno == EWOULDBLOCK || errno == EINTR || errno == EAGAIN  ))){
+                epoll_event ev;
+                ev.data.fd = fd;
+                ev.events = EPOLLIN;
+                scheduler->del_epoll(fd,ev);
+                close(fd);
+                break;
+            }
+            co_yield len;
+        }
+        co_return std::move(len);
     }
 
-    static Coroutine<Net_Result::Ptr> co_send(int fd, void *buf, size_t n, int flags)
+    static Coroutine<int> co_send(int fd, void *buf, size_t n, int flags)
     {
-        int ret = send(fd, buf, n, flags);
-        Net_Result::Ptr res = std::make_shared<Net_Result>(ret);
-        co_return std::move(res);
+        int len;
+        while (1)
+        {
+            len = send(fd, buf, n, flags);
+            if(len == -1 && !(errno == EWOULDBLOCK || errno == EINTR || errno == EAGAIN )){
+                epoll_event ev;
+                ev.data.fd = fd;
+                ev.events = EPOLLIN;
+                scheduler->del_epoll(fd,ev);
+                close(fd);
+                break;
+            }
+            co_yield len;
+        }
+        co_return std::move(len);
     }
-
-private:
 
     
 };

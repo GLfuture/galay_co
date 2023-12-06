@@ -1,6 +1,0 @@
-/home/gong/projects/galay_co/build/CMakeFiles/test.dir
-/home/gong/projects/galay_co/build/CMakeFiles/edit_cache.dir
-/home/gong/projects/galay_co/build/CMakeFiles/rebuild_cache.dir
-/home/gong/projects/galay_co/build/src/CMakeFiles/galay_co.dir
-/home/gong/projects/galay_co/build/src/CMakeFiles/edit_cache.dir
-/home/gong/projects/galay_co/build/src/CMakeFiles/rebuild_cache.dir

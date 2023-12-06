@@ -6,61 +6,75 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <string.h>
-
+#include <signal.h>
 using namespace std;
 
-Co_Net_Scheduler<Net_Result::Ptr>* scheduler = Co_Net_Scheduler<Net_Result::Ptr>::GetInstance("system");
-
-Coroutine<Net_Result::Ptr> recv_and_send(int fd)
+Coroutine<int> recv_and_send(int fd)
 {
 	char buffer[512];
 	while (1)
 	{
 		memset(buffer,0,512);
-		std::shared_ptr<Net_Result> res = std::make_shared<Net_Result>(1);
-		co_yield res;
-
-		int len = recv(fd, buffer, 512, 0);
-		if (len == -1) continue;
-		else if(len == 0 ){
-			scheduler->del_corotine(fd);
-			co_return std::move(res);
+		if(scheduler->is_stop())
+		{
+			co_return std::move(1);
 		}
-
-		len = send(fd, buffer, 512, 0);
+		Coroutine<int> rco = Co_Function::co_recv(fd, buffer, 512, 0);
+		// if(rco.promise().result() == -1) continue;
+		// std::string msg1(buffer,rco.promise().result());
+		// std::cout<<msg1<<std::endl;
+		if(rco.promise().result() == -1) {
+			co_yield 1;
+			rco.resume();
+		}
+		if(rco.done()){
+			break;
+		}
+		std::string msg(buffer,rco.promise().result());
+		std::cout<<msg<<std::endl;
+		epoll_event ev;
+		ev.data.fd = fd;
+		ev.events = EPOLLOUT;
+		scheduler->mod_epoll(fd,ev);
+		Coroutine<int> wco = Co_Function::co_send(fd,buffer,rco.promise().result(),0);
+		if(wco.promise().result() == -1) {
+			co_yield 1;
+			wco.resume();
+		}
+		if(wco.done()) break;
+		ev.events = EPOLLIN;
+		scheduler->mod_epoll(fd,ev);
 	}
-	
+	co_return -1;
 }
 
-Coroutine<Net_Result::Ptr> get_conn(int fd)
+Coroutine<int> get_conn(int fd)
 {
 	while (1)
 	{
 		sockaddr sin;
-		socklen_t len;
-		co_await Awaiter();
-		int sockfd = accept(fd, &sin, &len);
-		Net_Result::Ptr res = std::make_shared<Net_Result>(sockfd);
-		if(sockfd > 0){
-			epoll_event ev;
-			ev.data.fd = sockfd;
-			ev.events = EPOLLIN;
-			epoll_ctl(scheduler->get_epoll_fd(), EPOLL_CTL_ADD, sockfd, &ev);
-			Coroutine<Net_Result::Ptr> func = recv_and_send(sockfd);
-			scheduler->add_coroutine(sockfd,&func);
-			if(func.promise().get_status() == SUSPEND) co_yield std::move(res);
-			std::cout<<"add: "<< sockfd << " "<< &func<<std::endl;
-		}else{
-			continue;
-		}
-		
-		co_yield std::move(res);
+		socklen_t len = sizeof(sockaddr);
+		Coroutine<int> aco = Co_Function::co_accept(fd, &sin, &len);
+		if(aco.promise().get_status() == SUSPEND) co_yield 1;
+		std::cout<<"ready to resume\n";
+		aco.resume();
+		std::cout<<"resume success\n";
+		if(aco.promise().result() <= 0) continue; 
+		Coroutine<int>* rwco = new Coroutine<int>(recv_and_send(aco.promise().result()));
+		scheduler->add_coroutine(aco.promise().result(),rwco);
 	}
 }
 
+void signal_handle(int sing)
+{
+	scheduler->stop();
+	delete scheduler;
+	exit(-1);
+}
 
 int main()
 {
+	signal(SIGINT,signal_handle);
 	int fd = Co_Function::co_socket(AF_INET,SOCK_STREAM,0);
 	sockaddr_in saddr;
 	saddr.sin_family = AF_INET;
@@ -72,8 +86,8 @@ int main()
 	ev.data.fd = fd;
 	ev.events = EPOLLIN;
 	epoll_ctl(scheduler->get_epoll_fd(),EPOLL_CTL_ADD,fd,&ev);
-	Coroutine<Net_Result::Ptr> server = get_conn(fd);
-	scheduler->add_coroutine(fd,&server);
+	Coroutine<int>* server = new Coroutine<int>(get_conn(fd));
+	scheduler->add_coroutine(fd,server);
 	scheduler->run();
 	
 	return 0;
