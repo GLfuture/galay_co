@@ -11,8 +11,9 @@
 #include <atomic>
 #include <sys/epoll.h>
 
-#define MAX_EVENT_SIZE		1024
-
+#define MAX_EVENT_SIZE					1024
+#define COROUTINE_INITIAL_SIZE			10
+#define COROUTINE_EXTEND_SIZE			11
 
 
 template<typename RESULT>
@@ -35,6 +36,7 @@ private:
 	{
 		this->m_name = name;
 		this->epfd = epoll_create(1024);
+		m_coroutines.assign(COROUTINE_INITIAL_SIZE,nullptr);
 	}
 
 	Co_Net_Scheduler(Co_Net_Scheduler<RESULT>&& other) = delete;
@@ -51,30 +53,27 @@ public:
 
 	void add_coroutine(uint32_t fd , MainCoroutine<RESULT>* co) override
 	{
-		typename std::map<uint32_t,MainCoroutine<RESULT>*>::iterator it = m_coroutines.find(fd);
-		if(it == m_coroutines.end()) {
-			m_coroutines.emplace(fd,co);
+		if(fd >= m_coroutines.size()){
+			m_coroutines.resize( fd + COROUTINE_EXTEND_SIZE);
 		}
-		else{
-			delete it->second;
-			it->second = co;
-		}
+		m_coroutines[fd] = co;
 	}
 
 	void del_coroutine(uint32_t fd)
 	{
-		typename std::map<uint32_t,MainCoroutine<RESULT>*>::iterator it = m_coroutines.find(fd);
-		if(it == m_coroutines.end()) return;
-		delete it->second;
-		it->second = nullptr;
-		m_coroutines.erase(it);
+		if(m_coroutines[fd] != nullptr){
+			delete m_coroutines[fd];
+		}
+		m_coroutines[fd] = nullptr;
 	}
 
 	int get_coroutine(uint32_t fd,MainCoroutine<RESULT>* co) override
 	{
-		auto it = m_coroutines.find(fd);
-		if (it == m_coroutines.end()) return -1;
-		co = it->second;
+		if(fd >= m_coroutines.size()) return -1;
+		else {
+			if(m_coroutines[fd] == nullptr) return -1;
+			else co = m_coroutines[fd];
+		}
 		return 0;
 	}
 
@@ -88,10 +87,7 @@ public:
 			for(int i = 0 ;i < nready ;i++)
 			{
 				cur_event = events + i;
-				typename std::map<uint32_t,MainCoroutine<RESULT>*>::iterator it = m_coroutines.find(events[i].data.fd);
-				if(it != m_coroutines.end()){
-					it->second->resume();
-				}
+				m_coroutines[events[i].data.fd]->resume();
 			}
 		}
 	}
@@ -103,10 +99,12 @@ public:
 	void stop() override
 	{
 		m_stop.store(true,std::memory_order_seq_cst);
-		for (auto &[ _ , value] : m_coroutines)
+		for (auto &ptr : m_coroutines)
 		{
-			value->promise().set_status(TERM);
-			if(!value->done()) value->resume();
+			if(ptr) {
+				ptr->promise().set_status(TERM);
+				if(!ptr->done()) ptr->resume();
+			}
 		}
 	}
 
@@ -123,18 +121,13 @@ public:
 	~Co_Net_Scheduler()
 	{
 		assert(m_stop.load());
-		for(typename std::map<uint32_t,MainCoroutine<RESULT>*>::iterator it = m_coroutines.begin();
-			it != m_coroutines.end();it++)
+		for(int i = 3 ; i < m_coroutines.size() ; i++)
 		{
-			delete it->second;
-			it->second = nullptr;
-			close(it->first);
-			del_epoll(it->first,EPOLLIN | EPOLLOUT);
-			it = m_coroutines.erase(it);
-			if(it == m_coroutines.end()){
-				break;
+			if(m_coroutines[i]){
+				delete m_coroutines[i];
+				close(i);
+				del_epoll(i,EPOLLIN | EPOLLOUT);
 			}
-			it -- ;
 		}
 	}
 
@@ -169,7 +162,7 @@ protected:
 	epoll_event events[MAX_EVENT_SIZE];
 	std::string m_name;
 	std::atomic_bool m_stop = false;
-	std::map<uint32_t,MainCoroutine<RESULT>*> m_coroutines;
+	std::vector<MainCoroutine<RESULT>*> m_coroutines;
 };
 
 
