@@ -8,7 +8,7 @@
 
 enum Co_Status
 {
-	INIT,
+	INIT = -100,
 	READY,
 	RUNNING,
 	SUSPEND,

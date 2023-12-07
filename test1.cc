@@ -21,9 +21,6 @@ MainCoroutine<int> recv_and_send(int fd)
 		{
 			co_return std::move(1);
 		}
-		// if(rco.promise().result() == -1) continue;
-		// std::string msg1(buffer,rco.promise().result());
-		// std::cout<<msg1<<std::endl;
 		co_yield 1;
 		if(scheduler->get_cur_event()->events & EPOLLIN)
 		{
@@ -34,9 +31,11 @@ MainCoroutine<int> recv_and_send(int fd)
 				break;
 			}
 			len = rco.promise().result() ;
-			std::string msg(buffer, rco.promise().result());
-			std::cout << msg << std::endl;
-			scheduler->mod_epoll(fd, EPOLLOUT);
+			if(len != -1){
+				std::string msg(buffer, rco.promise().result());
+				std::cout << msg << std::endl;
+				scheduler->mod_epoll(fd, EPOLLOUT);
+			}
 		}else if(scheduler->get_cur_event()->events & EPOLLOUT)
 		{
 			wco.resume();
@@ -44,8 +43,7 @@ MainCoroutine<int> recv_and_send(int fd)
 				scheduler->del_epoll(fd,EPOLLOUT);
 				break;
 			}
-			std::cout<< wco.promise().result() <<" " << buffer<<'\n';
-			scheduler->mod_epoll(fd, EPOLLIN);
+			if(wco.promise().result() != -1) scheduler->mod_epoll(fd, EPOLLIN);
 			memset(buffer,0,512);
 		}
 		
@@ -55,17 +53,20 @@ MainCoroutine<int> recv_and_send(int fd)
 
 MainCoroutine<int> get_conn(int fd)
 {
+	sockaddr sin;
+	socklen_t len = sizeof(sockaddr);
+	Coroutine<int> aco = Co_Function::co_accept(fd, &sin, &len);
 	while (1)
 	{
-		sockaddr sin;
-		socklen_t len = sizeof(sockaddr);
-		Coroutine<int> aco = Co_Function::co_accept(fd, &sin, &len);
-		if(aco.promise().get_status() == SUSPEND) co_yield 1;
+		if(aco.promise().result() == SUSPEND) co_yield 1;
 		aco.resume();
-		if(aco.promise().result() <= 0) continue; 
-		MainCoroutine<int>* rwco = new MainCoroutine<int>(recv_and_send(aco.promise().result()));
-		scheduler->add_coroutine(aco.promise().result(),rwco);
-		scheduler->add_epoll(aco.promise().result(),EPOLLIN);
+		if(aco.promise().result()!= SUSPEND)
+		{
+			std::cout << aco.promise().result() << std::endl;
+			MainCoroutine<int> *rwco = new MainCoroutine<int>(recv_and_send(aco.promise().result()));
+			scheduler->add_coroutine(aco.promise().result(), rwco);
+			scheduler->add_epoll(aco.promise().result(), EPOLLIN);
+		}
 	}
 }
 

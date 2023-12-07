@@ -52,7 +52,9 @@ public:
 	void add_coroutine(uint32_t fd , MainCoroutine<RESULT>* co) override
 	{
 		typename std::map<uint32_t,MainCoroutine<RESULT>*>::iterator it = m_coroutines.find(fd);
-		if(it == m_coroutines.end()) m_coroutines.emplace(fd,co);
+		if(it == m_coroutines.end()) {
+			m_coroutines.emplace(fd,co);
+		}
 		else{
 			delete it->second;
 			it->second = co;
@@ -82,10 +84,11 @@ public:
 		while (!m_stop.load())
 		{
 			int nready = epoll_wait(this->epfd,this->events,MAX_EVENT_SIZE,timeout);
-			while(nready -- > 0)
+			if(nready == 0) continue;
+			for(int i = 0 ;i < nready ;i++)
 			{
-				cur_event = events + nready;
-				typename std::map<uint32_t,MainCoroutine<RESULT>*>::iterator it = m_coroutines.find(events[nready].data.fd);
+				cur_event = events + i;
+				typename std::map<uint32_t,MainCoroutine<RESULT>*>::iterator it = m_coroutines.find(events[i].data.fd);
 				if(it != m_coroutines.end()){
 					it->second->resume();
 				}
@@ -125,6 +128,8 @@ public:
 		{
 			delete it->second;
 			it->second = nullptr;
+			close(it->first);
+			del_epoll(it->first,EPOLLIN | EPOLLOUT);
 			it = m_coroutines.erase(it);
 			if(it == m_coroutines.end()){
 				break;
@@ -138,6 +143,7 @@ public:
 		epoll_event ev;
 		ev.data.fd = fd;
 		ev.events = event;
+		std::cout<< fd <<"add epoll success\n";
 		return epoll_ctl(this->epfd,EPOLL_CTL_ADD,fd,&ev);
 	}
 
