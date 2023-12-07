@@ -9,7 +9,7 @@ using namespace std;
 
 Co_Net_Scheduler<int>* scheduler = Co_Net_Scheduler<int>::GetInstance("system");
 
-Coroutine<int> recv_and_send(int fd)
+MainCoroutine<int> recv_and_send(int fd)
 {
 	char buffer[512];
 	size_t len;
@@ -53,7 +53,7 @@ Coroutine<int> recv_and_send(int fd)
 	co_return -1;
 }
 
-Coroutine<int> get_conn(int fd)
+MainCoroutine<int> get_conn(int fd)
 {
 	while (1)
 	{
@@ -63,7 +63,7 @@ Coroutine<int> get_conn(int fd)
 		if(aco.promise().get_status() == SUSPEND) co_yield 1;
 		aco.resume();
 		if(aco.promise().result() <= 0) continue; 
-		Coroutine<int>* rwco = new Coroutine<int>(recv_and_send(aco.promise().result()));
+		MainCoroutine<int>* rwco = new MainCoroutine<int>(recv_and_send(aco.promise().result()));
 		scheduler->add_coroutine(aco.promise().result(),rwco);
 		scheduler->add_epoll(aco.promise().result(),EPOLLIN);
 	}
@@ -83,7 +83,7 @@ int main()
 	Co_Function::co_bind(AF_INET,fd,9999,INADDR_ANY);
 	Co_Function::co_listen(fd,10);
 	scheduler->add_epoll(fd,EPOLLIN);
-	Coroutine<int>* server = new Coroutine<int>(get_conn(fd));
+	MainCoroutine<int>* server = new MainCoroutine<int>(get_conn(fd));
 	scheduler->add_coroutine(fd,server);
 	scheduler->run();
 	

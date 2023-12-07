@@ -120,5 +120,4 @@ public:
 };
 
 
-
 #endif // !__GALAY_CO_FUNCTION_H__

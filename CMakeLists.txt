@@ -5,7 +5,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED on)
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_BUILD_TYPE Debug)
 
-set(SRC_LIST test2.cc)
+set(SRC_LIST test1.cc)
 set(LIB_LIST galay_co)
 
 include_directories(include)

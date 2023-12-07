@@ -210,7 +210,6 @@ public:
 
 	~Coroutine()
 	{
-		std::cout<<"析构："<<co_id<<'\n';
 		if (co_handle) {
 			co_handle.destroy();
 		}
@@ -220,11 +219,45 @@ public:
 
 	Coroutine& operator=(Coroutine& other) = delete;
 	
-private:
+protected:
 	//协程id
 	uint64_t co_id = 0;
 	//协程句柄
 	std::coroutine_handle<promise_type> co_handle = nullptr;
+};
+
+//主协程
+template<typename RESULT>
+class MainCoroutine:public Coroutine<RESULT>
+{
+public:
+	using promise_type = Promise<RESULT>;
+
+	MainCoroutine<RESULT> &operator=(MainCoroutine<RESULT>&& other)
+	{
+		this->co_handle = other.co_handle;
+		this->co_id = other.co_id;
+		return *this;
+	}
+
+	MainCoroutine(){}
+
+	MainCoroutine(std::coroutine_handle<promise_type> co_handle) noexcept
+	{
+		this->co_handle = co_handle;
+        this->co_id = global_co_id ++;
+	}
+
+	MainCoroutine(MainCoroutine<RESULT>&& other) noexcept
+	{
+		this->co_handle = other.co_handle;
+		this->co_id = other.co_id;
+	}
+
+	static MainCoroutine<RESULT> creat(std::function<MainCoroutine<RESULT>()>&& func)
+	{
+		return MainCoroutine<RESULT>(func());
+	}
 };
 
 
@@ -236,8 +269,6 @@ public:
 	virtual void await_resume() { }
 	virtual void await_suspend(std::coroutine_handle<> co_handle) {}
 };
-
-
 
 #endif
 

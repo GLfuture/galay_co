@@ -14,13 +14,14 @@
 #define MAX_EVENT_SIZE		1024
 
 
+
 template<typename RESULT>
 class Co_Scheduler
 {
 public:
 	using Ptr = std::shared_ptr<Co_Scheduler>;
-	virtual void add_coroutine(uint32_t fd, Coroutine<RESULT>* co) = 0;
-	virtual int get_coroutine(uint32_t fd,Coroutine<RESULT>* co) = 0;
+	virtual void add_coroutine(uint32_t fd, MainCoroutine<RESULT>* co) = 0;
+	virtual int get_coroutine(uint32_t fd,MainCoroutine<RESULT>* co) = 0;
 	virtual void stop() = 0;
 	virtual void run(int timeout = -1) = 0;
 	virtual ~Co_Scheduler(){}
@@ -48,21 +49,26 @@ public:
 		return new Co_Net_Scheduler<RESULT>(name);
 	}
 
-	void add_coroutine(uint32_t fd , Coroutine<RESULT>* co) override
+	void add_coroutine(uint32_t fd , MainCoroutine<RESULT>* co) override
 	{
-		m_coroutines[fd] = co;
+		typename std::map<uint32_t,MainCoroutine<RESULT>*>::iterator it = m_coroutines.find(fd);
+		if(it == m_coroutines.end()) m_coroutines.emplace(fd,co);
+		else{
+			delete it->second;
+			it->second = co;
+		}
 	}
 
 	void del_coroutine(uint32_t fd)
 	{
-		typename std::map<uint32_t,Coroutine<RESULT>*>::iterator it = m_coroutines.find(fd);
+		typename std::map<uint32_t,MainCoroutine<RESULT>*>::iterator it = m_coroutines.find(fd);
 		if(it == m_coroutines.end()) return;
 		delete it->second;
 		it->second = nullptr;
 		m_coroutines.erase(it);
 	}
 
-	int get_coroutine(uint32_t fd,Coroutine<RESULT>* co) override
+	int get_coroutine(uint32_t fd,MainCoroutine<RESULT>* co) override
 	{
 		auto it = m_coroutines.find(fd);
 		if (it == m_coroutines.end()) return -1;
@@ -79,7 +85,7 @@ public:
 			while(nready -- > 0)
 			{
 				cur_event = events + nready;
-				typename std::map<uint32_t,Coroutine<RESULT>*>::iterator it = m_coroutines.find(events[nready].data.fd);
+				typename std::map<uint32_t,MainCoroutine<RESULT>*>::iterator it = m_coroutines.find(events[nready].data.fd);
 				if(it != m_coroutines.end()){
 					it->second->resume();
 				}
@@ -114,7 +120,7 @@ public:
 	~Co_Net_Scheduler()
 	{
 		assert(m_stop.load());
-		for(typename std::map<uint32_t,Coroutine<RESULT>*>::iterator it = m_coroutines.begin();
+		for(typename std::map<uint32_t,MainCoroutine<RESULT>*>::iterator it = m_coroutines.begin();
 			it != m_coroutines.end();it++)
 		{
 			delete it->second;
@@ -157,7 +163,7 @@ protected:
 	epoll_event events[MAX_EVENT_SIZE];
 	std::string m_name;
 	std::atomic_bool m_stop = false;
-	std::map<uint32_t,Coroutine<RESULT>*> m_coroutines;
+	std::map<uint32_t,MainCoroutine<RESULT>*> m_coroutines;
 };
 
 
