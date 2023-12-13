@@ -1,5 +1,4 @@
-// cppco.cpp: 定义应用程序的入口点。
-//
+
 
 #include "galay_co.h"
 #include "galay_co_function.h"
@@ -33,7 +32,6 @@ MainCoroutine<int> recv_and_send(int fd)
 			len = rco.promise().result() ;
 			if(len != -1){
 				std::string msg(buffer, rco.promise().result());
-				std::cout << msg << std::endl;
 				scheduler->mod_epoll(fd, EPOLLOUT);
 			}
 		}else if(scheduler->get_cur_event()->events & EPOLLOUT)
@@ -87,6 +85,6 @@ int main()
 	MainCoroutine<int>* server = new MainCoroutine<int>(get_conn(fd));
 	scheduler->add_coroutine(fd,server);
 	scheduler->run();
-	
+
 	return 0;
 }

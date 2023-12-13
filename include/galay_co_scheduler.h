@@ -102,7 +102,6 @@ public:
 		for (auto &ptr : m_coroutines)
 		{
 			if(ptr) {
-				ptr->promise().set_status(TERM);
 				if(!ptr->done()) ptr->resume();
 			}
 		}

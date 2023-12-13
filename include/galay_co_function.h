@@ -10,6 +10,11 @@
 #include <unistd.h>
 #include <fcntl.h>
 
+enum Ret_Value{
+    SUSPEND = -100,
+};
+
+
 class Co_Function
 {
 public:

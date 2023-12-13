@@ -6,16 +6,6 @@
 #include <iostream>
 #include <memory>
 
-enum Co_Status
-{
-	INIT = -100,
-	READY,
-	RUNNING,
-	SUSPEND,
-	TERM,
-	FINISH,
-};
-
 static uint64_t global_co_id = 0;
 
 template<typename RESULT>
@@ -35,24 +25,20 @@ public:
 	auto get_return_object() { return std::coroutine_handle<Promise>::from_promise(*this); }
 
 	std::suspend_never initial_suspend() noexcept { 
-		co_status = RUNNING;
 		return {}; 
 	}
 
     auto yield_value(const RESULT& value){
 		m_result = value;
-		co_status = SUSPEND;
         return std::suspend_always{};
     }
 
 	auto yield_value(RESULT&& value){
 		m_result = value;
-		co_status = SUSPEND;
         return std::suspend_always{};
     }
 
 	std::suspend_always final_suspend() noexcept { 
-		co_status = FINISH;
 		return {}; 
 	}
 
@@ -70,16 +56,6 @@ public:
 		return this->m_result;
 	}
 
-	Co_Status get_status()
-	{
-		return this->co_status; 
-	}
-
-	void set_status(Co_Status status)
-	{
-		this->co_status = status;
-	}
-
 private:
 	void rethrow_if_exception()
 	{
@@ -91,7 +67,6 @@ private:
 private:
 	std::exception_ptr m_exception = nullptr;
 	RESULT m_result;
-	Co_Status co_status = INIT;
 };
 
 template<>
@@ -105,19 +80,16 @@ public:
 	auto get_return_object() { return std::coroutine_handle<Promise>::from_promise(*this); }
 
 	std::suspend_never initial_suspend() noexcept { 
-		co_status = RUNNING;
 		return {}; 
 	}
 
     template<typename T>
     auto yield_value(const T& value){
-		this->co_status = SUSPEND;
         return std::suspend_always{};
     }
 
 
 	std::suspend_always final_suspend() noexcept { 
-		this->co_status = FINISH;
 		return {}; 
 	}
 
@@ -132,16 +104,6 @@ public:
 		rethrow_if_exception();
 	}
 
-	Co_Status get_status()
-	{
-		return this->co_status; 
-	}
-
-	void set_status(Co_Status status)
-	{
-		this->co_status = status;
-	}
-
 private:
 	void rethrow_if_exception()
 	{
@@ -152,7 +114,6 @@ private:
 	}
 private:
 	std::exception_ptr m_exception = nullptr;
-	Co_Status co_status = INIT;
 };
 
 template<typename RESULT>
